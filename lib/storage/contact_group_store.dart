@@ -1,12 +1,12 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/contact_group.dart';
+import 'prefs_manager.dart';
 
 class ContactGroupStore {
   static const String _key = 'contact_groups';
 
   Future<List<ContactGroup>> loadGroups() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final raw = prefs.getString(_key);
     if (raw == null || raw.isEmpty) return [];
 
@@ -25,7 +25,7 @@ class ContactGroupStore {
   }
 
   Future<void> saveGroups(List<ContactGroup> groups) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final encoded = jsonEncode(groups.map((group) => group.toJson()).toList());
     await prefs.setString(_key, encoded);
   }

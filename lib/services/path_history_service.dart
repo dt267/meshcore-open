@@ -10,6 +10,10 @@ class PathHistoryService extends ChangeNotifier {
   final Map<String, int> _autoRotationIndex = {};
   final Map<String, _FloodStats> _floodStats = {};
 
+  // LRU cache eviction tracking
+  static const int _maxCachedContacts = 50;
+  final List<String> _cacheAccessOrder = [];
+
   static const int _maxHistoryEntries = 100;
   static const int _autoRotationTopCount = 3;
 
@@ -90,6 +94,8 @@ class PathHistoryService extends ChangeNotifier {
     if (ranked.isEmpty) {
       return const PathSelection(pathBytes: [], hopCount: -1, useFlood: true);
     }
+
+    _trackAccess(contactPubKeyHex);
 
     final selections = ranked
         .map((path) => PathSelection(
@@ -208,6 +214,8 @@ class PathHistoryService extends ChangeNotifier {
     );
 
     _cache[contactPubKeyHex] = updatedHistory;
+    _trackAccess(contactPubKeyHex);
+    _evictIfNeeded();
     _storage.savePathHistory(contactPubKeyHex, updatedHistory);
 
     notifyListeners();
@@ -216,12 +224,15 @@ class PathHistoryService extends ChangeNotifier {
   List<PathRecord> getRecentPaths(String contactPubKeyHex) {
     final history = _cache[contactPubKeyHex];
     if (history != null) {
+      _trackAccess(contactPubKeyHex);
       return history.recentPaths;
     }
 
     _loadHistoryFromStorage(contactPubKeyHex).then((loaded) {
       if (loaded != null) {
         _cache[contactPubKeyHex] = loaded;
+        _trackAccess(contactPubKeyHex);
+        _evictIfNeeded();
         notifyListeners();
       }
     });
@@ -236,16 +247,23 @@ class PathHistoryService extends ChangeNotifier {
 
   PathRecord? getFastestPath(String contactPubKeyHex) {
     final history = _cache[contactPubKeyHex];
+    if (history != null) {
+      _trackAccess(contactPubKeyHex);
+    }
     return history?.fastest;
   }
 
   PathRecord? getMostRecentPath(String contactPubKeyHex) {
     final history = _cache[contactPubKeyHex];
+    if (history != null) {
+      _trackAccess(contactPubKeyHex);
+    }
     return history?.mostRecent;
   }
 
   Future<void> clearPathHistory(String contactPubKeyHex) async {
     _cache.remove(contactPubKeyHex);
+    _cacheAccessOrder.remove(contactPubKeyHex);
     _autoRotationIndex.remove(contactPubKeyHex);
     _floodStats.remove(contactPubKeyHex);
     await _storage.clearPathHistory(contactPubKeyHex);
@@ -313,6 +331,20 @@ class PathHistoryService extends ChangeNotifier {
   void _updateFloodStats(String contactPubKeyHex) {
     final stats = _floodStats.putIfAbsent(contactPubKeyHex, () => _FloodStats());
     stats.lastUsed = DateTime.now();
+  }
+
+  void _trackAccess(String contactPubKeyHex) {
+    _cacheAccessOrder.remove(contactPubKeyHex);
+    _cacheAccessOrder.add(contactPubKeyHex);
+  }
+
+  void _evictIfNeeded() {
+    while (_cache.length > _maxCachedContacts && _cacheAccessOrder.isNotEmpty) {
+      final oldest = _cacheAccessOrder.removeAt(0);
+      _cache.remove(oldest);
+      _autoRotationIndex.remove(oldest);
+      _floodStats.remove(oldest);
+    }
   }
 }
 

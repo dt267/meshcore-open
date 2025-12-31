@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:media_kit_fork/media_kit_fork.dart';
 
 import 'connector/meshcore_connector.dart';
 import 'screens/scanner_screen.dart';
@@ -12,10 +11,13 @@ import 'services/notification_service.dart';
 import 'services/ble_debug_log_service.dart';
 import 'services/background_service.dart';
 import 'services/map_tile_cache_service.dart';
+import 'storage/prefs_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
+
+  // Initialize SharedPreferences cache
+  await PrefsManager.initialize();
 
   // Initialize services
   final storage = StorageService();

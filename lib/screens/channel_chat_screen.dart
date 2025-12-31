@@ -32,6 +32,8 @@ class ChannelChatScreen extends StatefulWidget {
 class _ChannelChatScreenState extends State<ChannelChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  ChannelMessage? _replyingToMessage;
+  final Map<String, GlobalKey> _messageKeys = {};
 
   @override
   void initState() {
@@ -58,6 +60,41 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         curve: Curves.easeOut,
       );
     }
+  }
+
+  void _setReplyingTo(ChannelMessage message) {
+    setState(() {
+      _replyingToMessage = message;
+    });
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingToMessage = null;
+    });
+  }
+
+  Future<void> _scrollToMessage(String messageId) async {
+    final key = _messageKeys[messageId];
+    if (key == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Original message not found'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final targetContext = key.currentContext;
+    if (targetContext == null) return;
+
+    await Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      alignment: 0.3,
+    );
   }
 
   @override
@@ -149,12 +186,16 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                   return ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(8),
-                    cacheExtent: 0,
-                    addAutomaticKeepAlives: false,
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final message = messages[index];
-                      return _buildMessageBubble(message);
+                      if (!_messageKeys.containsKey(message.messageId)) {
+                        _messageKeys[message.messageId] = GlobalKey();
+                      }
+                      return Container(
+                        key: _messageKeys[message.messageId]!,
+                        child: _buildMessageBubble(message),
+                      );
                     },
                   );
                 },
@@ -213,6 +254,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
+                    ],
+                    if (message.replyToMessageId != null) ...[
+                      _buildReplyPreview(message),
+                      const SizedBox(height: 8),
                     ],
                     if (poi != null)
                       _buildPoiMessage(context, poi, isOutgoing)
@@ -278,6 +323,79 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildReplyPreview(ChannelMessage message) {
+    final connector = context.read<MeshCoreConnector>();
+    final isOwnNode = message.replyToSenderName == connector.selfName;
+    final replyText = message.replyToText ?? '';
+
+    final gifId = _parseGifId(replyText);
+    final poi = _parsePoiMessage(replyText);
+
+    Widget contentPreview;
+    if (gifId != null) {
+      contentPreview = Row(
+        children: [
+          Icon(Icons.gif_box, size: 14, color: Colors.grey[600]),
+          const SizedBox(width: 4),
+          Text('GIF', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        ],
+      );
+    } else if (poi != null) {
+      contentPreview = Row(
+        children: [
+          Icon(Icons.location_on_outlined, size: 14, color: Colors.grey[600]),
+          const SizedBox(width: 4),
+          Text('Location', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        ],
+      );
+    } else {
+      contentPreview = Text(
+        replyText,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey[700],
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => _scrollToMessage(message.replyToMessageId!),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border(
+            left: BorderSide(
+              color: Theme.of(context).colorScheme.primary,
+              width: 3,
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reply to ${message.replyToSenderName}',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isOwnNode
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 2),
+            contentPreview,
+          ],
+        ),
       ),
     );
   }
@@ -412,22 +530,84 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     return colors[hash.abs() % colors.length];
   }
 
-  Widget _buildMessageComposer() {
-    final connector = context.watch<MeshCoreConnector>();
-    final maxBytes = maxChannelMessageBytes(connector.selfName);
+  Widget _buildReplyBanner() {
+    final message = _replyingToMessage!;
     return Container(
-      padding: const EdgeInsets.all(8),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
+        color: Theme.of(context).colorScheme.secondaryContainer,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.reply,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Replying to ${message.senderName}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                Text(
+                  message.text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: _cancelReply,
+            color: Theme.of(context).colorScheme.onSecondaryContainer,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
-      child: Row(
+    );
+  }
+
+  Widget _buildMessageComposer() {
+    final connector = context.watch<MeshCoreConnector>();
+    final maxBytes = maxChannelMessageBytes(connector.selfName);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_replyingToMessage != null) _buildReplyBanner(),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 4,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Row(
         children: [
           IconButton(
             icon: const Icon(Icons.gif_box),
@@ -491,7 +671,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             color: Theme.of(context).colorScheme.primary,
           ),
         ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -500,16 +682,23 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     if (text.isEmpty) return;
 
     final connector = context.read<MeshCoreConnector>();
+
+    String messageText = text;
+    if (_replyingToMessage != null) {
+      messageText = '@[${_replyingToMessage!.senderName}] $text';
+    }
+
     final maxBytes = maxChannelMessageBytes(connector.selfName);
-    if (utf8.encode(text).length > maxBytes) {
+    if (utf8.encode(messageText).length > maxBytes) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Message too long (max $maxBytes bytes).')),
       );
       return;
     }
 
-    connector.sendChannelMessage(widget.channel, text);
+    connector.sendChannelMessage(widget.channel, messageText);
     _textController.clear();
+    _cancelReply();
   }
 
   String _formatTime(DateTime time) {
@@ -539,6 +728,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: const Icon(Icons.reply),
+              title: const Text('Reply'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _setReplyingTo(message);
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.copy),
               title: const Text('Copy'),

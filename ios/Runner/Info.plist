@@ -53,7 +53,5 @@
 	<string>This app uses Bluetooth to communicate with MeshCore devices.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app uses Bluetooth to communicate with MeshCore devices.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs microphone access to record voice messages.</string>
 </dict>
 </plist>

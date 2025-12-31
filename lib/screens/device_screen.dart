@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../connector/meshcore_connector.dart';
+import '../utils/dialog_utils.dart';
+import '../utils/disconnect_navigation_mixin.dart';
 import '../utils/route_transitions.dart';
 import '../widgets/quick_switch_bar.dart';
 import 'channels_screen.dart';
@@ -17,7 +19,8 @@ class DeviceScreen extends StatefulWidget {
   State<DeviceScreen> createState() => _DeviceScreenState();
 }
 
-class _DeviceScreenState extends State<DeviceScreen> {
+class _DeviceScreenState extends State<DeviceScreen>
+    with DisconnectNavigationMixin {
   bool _showBatteryVoltage = false;
   int _quickIndex = 0;
 
@@ -25,13 +28,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
   Widget build(BuildContext context) {
     return Consumer<MeshCoreConnector>(
       builder: (context, connector, child) {
-        // If disconnected, pop back to scanner
-        if (!connector.isConnected) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) {
-              Navigator.popUntil(context, (route) => route.isFirst);
-            }
-          });
+        // Auto-navigate back to scanner if disconnected
+        if (!checkConnectionAndNavigate(connector)) {
+          return const SizedBox.shrink();
         }
 
         final theme = Theme.of(context);
@@ -286,26 +285,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
     BuildContext context,
     MeshCoreConnector connector,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Disconnect'),
-        content: const Text('Are you sure you want to disconnect from this device?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Disconnect'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await connector.disconnect();
-    }
+    await showDisconnectDialog(context, connector);
   }
 }

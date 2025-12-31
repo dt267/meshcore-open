@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_settings.dart';
+import '../storage/prefs_manager.dart';
 
 class AppSettingsService extends ChangeNotifier {
   static const String _settingsKey = 'app_settings';
@@ -17,7 +17,7 @@ class AppSettingsService extends ChangeNotifier {
   }
 
   Future<void> loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final jsonStr = prefs.getString(_settingsKey);
 
     if (jsonStr != null) {
@@ -36,7 +36,7 @@ class AppSettingsService extends ChangeNotifier {
     _settings = newSettings;
     notifyListeners();
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final jsonStr = jsonEncode(_settings.toJson());
     await prefs.setString(_settingsKey, jsonStr);
   }

@@ -34,6 +34,10 @@ class ChannelMessage {
   final Uint8List pathBytes;
   final List<Uint8List> pathVariants;
   final int? channelIndex;
+  final String messageId;
+  final String? replyToMessageId;
+  final String? replyToSenderName;
+  final String? replyToText;
 
   ChannelMessage({
     this.senderKey,
@@ -48,7 +52,12 @@ class ChannelMessage {
     Uint8List? pathBytes,
     List<Uint8List>? pathVariants,
     this.channelIndex,
-  })  : pathBytes = pathBytes ?? Uint8List(0),
+    String? messageId,
+    this.replyToMessageId,
+    this.replyToSenderName,
+    this.replyToText,
+  })  : messageId = messageId ?? '${timestamp.millisecondsSinceEpoch}_${senderName.hashCode}_${text.hashCode}',
+        pathBytes = pathBytes ?? Uint8List(0),
         pathVariants = _mergePathVariants(
           pathBytes ?? Uint8List(0),
           pathVariants,
@@ -63,6 +72,9 @@ class ChannelMessage {
     int? pathLength,
     Uint8List? pathBytes,
     List<Uint8List>? pathVariants,
+    String? replyToMessageId,
+    String? replyToSenderName,
+    String? replyToText,
   }) {
     return ChannelMessage(
       senderKey: senderKey,
@@ -77,6 +89,10 @@ class ChannelMessage {
       pathBytes: pathBytes ?? this.pathBytes,
       pathVariants: pathVariants ?? this.pathVariants,
       channelIndex: channelIndex,
+      messageId: messageId,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      replyToSenderName: replyToSenderName ?? this.replyToSenderName,
+      replyToText: replyToText ?? this.replyToText,
     );
   }
 
@@ -207,4 +223,24 @@ class ChannelMessage {
     }
     return true;
   }
+
+  static ReplyInfo? parseReplyMention(String text) {
+    final regex = RegExp(r'^@\[([^\]]+)\]\s+(.+)$', dotAll: true);
+    final match = regex.firstMatch(text);
+    if (match == null) return null;
+    return ReplyInfo(
+      mentionedNode: match.group(1)!,
+      actualMessage: match.group(2)!,
+    );
+  }
+}
+
+class ReplyInfo {
+  final String mentionedNode;
+  final String actualMessage;
+
+  ReplyInfo({
+    required this.mentionedNode,
+    required this.actualMessage,
+  });
 }

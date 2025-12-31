@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,8 +9,11 @@ import '../models/contact.dart';
 import '../models/contact_group.dart';
 import '../storage/contact_group_store.dart';
 import '../utils/contact_search.dart';
+import '../utils/dialog_utils.dart';
+import '../utils/disconnect_navigation_mixin.dart';
 import '../utils/emoji_utils.dart';
 import '../utils/route_transitions.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/quick_switch_bar.dart';
 import '../widgets/repeater_login_dialog.dart';
 import '../widgets/unread_badge.dart';
@@ -46,7 +51,8 @@ class ContactsScreen extends StatefulWidget {
   State<ContactsScreen> createState() => _ContactsScreenState();
 }
 
-class _ContactsScreenState extends State<ContactsScreen> {
+class _ContactsScreenState extends State<ContactsScreen>
+    with DisconnectNavigationMixin {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   ContactSortOption _sortOption = ContactSortOption.lastSeen;
@@ -54,6 +60,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   bool _showUnreadOnly = false;
   final ContactGroupStore _groupStore = ContactGroupStore();
   List<ContactGroup> _groups = [];
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -63,6 +70,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -82,16 +90,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     final connector = context.watch<MeshCoreConnector>();
-    final allowBack = !connector.isConnected;
 
-    if (!connector.isConnected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          Navigator.popUntil(context, (route) => route.isFirst);
-        }
-      });
+    // Auto-navigate back to scanner if disconnected
+    if (!checkConnectionAndNavigate(connector)) {
+      return const SizedBox.shrink();
     }
 
+    final allowBack = !connector.isConnected;
     final theme = Theme.of(context);
 
     return PopScope(
@@ -245,27 +250,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     BuildContext context,
     MeshCoreConnector connector,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Disconnect'),
-        content: const Text('Are you sure you want to disconnect from this device?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Disconnect'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await connector.disconnect();
-    }
+    await showDisconnectDialog(context, connector);
   }
 
   Widget _buildContactsBody(BuildContext context, MeshCoreConnector connector) {
@@ -276,23 +261,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }
 
     if (contacts.isEmpty && _groups.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No contacts yet',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Contacts will appear when devices advertise',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-            ),
-          ],
-        ),
+      return const EmptyState(
+        icon: Icons.people_outline,
+        title: 'No contacts yet',
+        subtitle: 'Contacts will appear when devices advertise',
       );
     }
 
@@ -326,8 +298,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
             onChanged: (value) {
-              setState(() {
-                _searchQuery = value.toLowerCase();
+              _searchDebounce?.cancel();
+              _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+                if (!mounted) return;
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
               });
             },
           ),

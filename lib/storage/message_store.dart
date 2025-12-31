@@ -1,21 +1,21 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/message.dart';
 import '../helpers/smaz.dart';
+import 'prefs_manager.dart';
 
 class MessageStore {
   static const String _keyPrefix = 'messages_';
 
   Future<void> saveMessages(String contactKeyHex, List<Message> messages) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_keyPrefix$contactKeyHex';
     final jsonList = messages.map(_messageToJson).toList();
     await prefs.setString(key, jsonEncode(jsonList));
   }
 
   Future<List<Message>> loadMessages(String contactKeyHex) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_keyPrefix$contactKeyHex';
     final jsonString = prefs.getString(key);
     if (jsonString == null) return [];
@@ -29,7 +29,7 @@ class MessageStore {
   }
 
   Future<void> clearMessages(String contactKeyHex) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_keyPrefix$contactKeyHex';
     await prefs.remove(key);
   }
@@ -41,10 +41,6 @@ class MessageStore {
       'timestamp': msg.timestamp.millisecondsSinceEpoch,
       'isOutgoing': msg.isOutgoing,
       'isCli': msg.isCli,
-      'isVoice': msg.isVoice,
-      'voicePath': msg.voicePath,
-      'voiceDurationMs': msg.voiceDurationMs,
-      'voiceCodec': msg.voiceCodec,
       'status': msg.status.index,
       'messageId': msg.messageId,
       'retryCount': msg.retryCount,
@@ -69,10 +65,6 @@ class MessageStore {
       timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] as int),
       isOutgoing: json['isOutgoing'] as bool,
       isCli: isCli,
-      isVoice: json['isVoice'] as bool? ?? false,
-      voicePath: json['voicePath'] as String?,
-      voiceDurationMs: json['voiceDurationMs'] as int?,
-      voiceCodec: json['voiceCodec'] as String?,
       status: MessageStatus.values[json['status'] as int],
       messageId: json['messageId'] as String?,
       retryCount: json['retryCount'] as int? ?? 0,

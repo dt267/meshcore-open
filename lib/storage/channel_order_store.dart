@@ -1,16 +1,16 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'prefs_manager.dart';
 
 class ChannelOrderStore {
   static const String _key = 'channel_order';
 
   Future<void> saveChannelOrder(List<int> order) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     await prefs.setString(_key, jsonEncode(order));
   }
 
   Future<List<int>> loadChannelOrder() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final raw = prefs.getString(_key);
     if (raw == null || raw.isEmpty) return [];
     try {

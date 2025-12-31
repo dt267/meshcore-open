@@ -7,7 +7,10 @@ import 'package:provider/provider.dart';
 
 import '../connector/meshcore_connector.dart';
 import '../models/channel.dart';
+import '../utils/dialog_utils.dart';
+import '../utils/disconnect_navigation_mixin.dart';
 import '../utils/route_transitions.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/quick_switch_bar.dart';
 import '../widgets/unread_badge.dart';
 import 'channel_chat_screen.dart';
@@ -27,7 +30,8 @@ class ChannelsScreen extends StatefulWidget {
   State<ChannelsScreen> createState() => _ChannelsScreenState();
 }
 
-class _ChannelsScreenState extends State<ChannelsScreen> {
+class _ChannelsScreenState extends State<ChannelsScreen>
+    with DisconnectNavigationMixin {
   @override
   void initState() {
     super.initState();
@@ -39,6 +43,12 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
   @override
   Widget build(BuildContext context) {
     final connector = context.watch<MeshCoreConnector>();
+
+    // Auto-navigate back to scanner if disconnected
+    if (!checkConnectionAndNavigate(connector)) {
+      return const SizedBox.shrink();
+    }
+
     final allowBack = !connector.isConnected;
 
     return PopScope(
@@ -77,23 +87,13 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
             final channels = connector.channels;
 
             if (channels.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.tag, size: 64, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No channels configured',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton.icon(
-                      onPressed: () => _addPublicChannel(context, connector),
-                      icon: const Icon(Icons.public),
-                      label: const Text('Add Public Channel'),
-                    ),
-                  ],
+              return EmptyState(
+                icon: Icons.tag,
+                title: 'No channels configured',
+                action: FilledButton.icon(
+                  onPressed: () => _addPublicChannel(context, connector),
+                  icon: const Icon(Icons.public),
+                  label: const Text('Add Public Channel'),
                 ),
               );
             }
@@ -190,14 +190,17 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
             ),
           ],
         ),
-        onTap: () {
+        onTap: () async {
           connector.markChannelRead(channel.index);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChannelChatScreen(channel: channel),
-            ),
-          );
+          await Future.delayed(const Duration(milliseconds: 50));
+          if (context.mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChannelChatScreen(channel: channel),
+              ),
+            );
+          }
         },
         onLongPress: () => _showChannelActions(context, connector, channel),
       ),
@@ -218,17 +221,23 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
             ListTile(
               leading: const Icon(Icons.edit_outlined),
               title: const Text('Edit channel'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                _showEditChannelDialog(context, connector, channel);
+                await Future.delayed(const Duration(milliseconds: 100));
+                if (context.mounted) {
+                  _showEditChannelDialog(context, connector, channel);
+                }
               },
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
               title: const Text('Delete channel', style: TextStyle(color: Colors.red)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                _confirmDeleteChannel(context, connector, channel);
+                await Future.delayed(const Duration(milliseconds: 100));
+                if (context.mounted) {
+                  _confirmDeleteChannel(context, connector, channel);
+                }
               },
             ),
           ],
@@ -261,27 +270,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
 
   Future<void> _disconnect(BuildContext context) async {
     final connector = context.read<MeshCoreConnector>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Disconnect'),
-        content: const Text('Are you sure you want to disconnect from this device?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Disconnect'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await connector.disconnect();
-    }
+    await showDisconnectDialog(context, connector);
   }
 
   void _showAddChannelDialog(BuildContext context) {
@@ -402,9 +391,11 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
 
                 Navigator.pop(context);
                 connector.setChannel(selectedIndex, name, psk);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Channel "$name" added')),
-                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Channel "$name" added')),
+                  );
+                }
               },
               child: const Text('Add'),
             ),

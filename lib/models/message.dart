@@ -10,10 +10,6 @@ class Message {
   final bool isOutgoing;
   final bool isCli;
   final MessageStatus status;
-  final bool isVoice;
-  final String? voicePath;
-  final int? voiceDurationMs;
-  final String? voiceCodec;
 
   // NEW: Retry logic fields
   final String? messageId;
@@ -34,10 +30,6 @@ class Message {
     required this.isOutgoing,
     this.isCli = false,
     this.status = MessageStatus.pending,
-    this.isVoice = false,
-    this.voicePath,
-    this.voiceDurationMs,
-    this.voiceCodec,
     this.messageId,
     this.retryCount = 0,
     this.estimatedTimeoutMs,
@@ -63,10 +55,6 @@ class Message {
     int? pathLength,
     Uint8List? pathBytes,
     bool? isCli,
-    bool? isVoice,
-    String? voicePath,
-    int? voiceDurationMs,
-    String? voiceCodec,
   }) {
     return Message(
       senderKey: senderKey,
@@ -75,10 +63,6 @@ class Message {
       isOutgoing: isOutgoing,
       isCli: isCli ?? this.isCli,
       status: status ?? this.status,
-      isVoice: isVoice ?? this.isVoice,
-      voicePath: voicePath ?? this.voicePath,
-      voiceDurationMs: voiceDurationMs ?? this.voiceDurationMs,
-      voiceCodec: voiceCodec ?? this.voiceCodec,
       messageId: messageId,
       retryCount: retryCount ?? this.retryCount,
       estimatedTimeoutMs: estimatedTimeoutMs ?? this.estimatedTimeoutMs,
@@ -117,7 +101,6 @@ class Message {
       isOutgoing: false,
       isCli: false,
       status: MessageStatus.delivered,
-      isVoice: false,
       pathBytes: Uint8List(0),
     );
   }
@@ -135,7 +118,6 @@ class Message {
       isOutgoing: true,
       isCli: false,
       status: MessageStatus.pending,
-      isVoice: false,
       pathLength: pathLength,
       pathBytes: pathBytes,
     );

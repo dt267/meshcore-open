@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/path_history.dart';
+import '../storage/prefs_manager.dart';
 
 class StorageService {
   static const String _pathHistoryPrefix = 'path_history_';
@@ -9,14 +9,14 @@ class StorageService {
 
   Future<void> savePathHistory(
       String contactPubKeyHex, ContactPathHistory history) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_pathHistoryPrefix$contactPubKeyHex';
     final jsonStr = jsonEncode(history.toJson());
     await prefs.setString(key, jsonStr);
   }
 
   Future<ContactPathHistory?> loadPathHistory(String contactPubKeyHex) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_pathHistoryPrefix$contactPubKeyHex';
     final jsonStr = prefs.getString(key);
 
@@ -31,13 +31,13 @@ class StorageService {
   }
 
   Future<void> clearPathHistory(String contactPubKeyHex) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_pathHistoryPrefix$contactPubKeyHex';
     await prefs.remove(key);
   }
 
   Future<void> clearAllPathHistories() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final keys = prefs.getKeys();
     final pathHistoryKeys =
         keys.where((key) => key.startsWith(_pathHistoryPrefix));
@@ -48,7 +48,7 @@ class StorageService {
   }
 
   Future<Map<String, String>> loadPendingMessages() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final jsonStr = prefs.getString(_pendingMessagesKey);
 
     if (jsonStr == null) return {};
@@ -62,20 +62,20 @@ class StorageService {
   }
 
   Future<void> savePendingMessages(Map<String, String> pending) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final jsonStr = jsonEncode(pending);
     await prefs.setString(_pendingMessagesKey, jsonStr);
   }
 
   Future<void> clearPendingMessages() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     await prefs.remove(_pendingMessagesKey);
   }
 
   /// Save a repeater password by public key hex
   Future<void> saveRepeaterPassword(
       String repeaterPubKeyHex, String password) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final passwords = await loadRepeaterPasswords();
     passwords[repeaterPubKeyHex] = password;
     final jsonStr = jsonEncode(passwords);
@@ -84,7 +84,7 @@ class StorageService {
 
   /// Load all saved repeater passwords (map of pubKeyHex -> password)
   Future<Map<String, String>> loadRepeaterPasswords() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final jsonStr = prefs.getString(_repeaterPasswordsKey);
 
     if (jsonStr == null) return {};
@@ -105,7 +105,7 @@ class StorageService {
 
   /// Remove a saved repeater password
   Future<void> removeRepeaterPassword(String repeaterPubKeyHex) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final passwords = await loadRepeaterPasswords();
     passwords.remove(repeaterPubKeyHex);
     final jsonStr = jsonEncode(passwords);
@@ -114,7 +114,7 @@ class StorageService {
 
   /// Clear all saved repeater passwords
   Future<void> clearAllRepeaterPasswords() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     await prefs.remove(_repeaterPasswordsKey);
   }
 }

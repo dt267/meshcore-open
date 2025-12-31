@@ -1,15 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../models/contact.dart';
+import 'prefs_manager.dart';
 
 class ContactStore {
   static const String _key = 'contacts';
 
   Future<List<Contact>> loadContacts() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final jsonStr = prefs.getString(_key);
     if (jsonStr == null) return [];
 
@@ -22,7 +21,7 @@ class ContactStore {
   }
 
   Future<void> saveContacts(List<Contact> contacts) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final jsonList = contacts.map(_toJson).toList();
     await prefs.setString(_key, jsonEncode(jsonList));
   }

@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/channel_message.dart';
 import '../helpers/smaz.dart';
+import 'prefs_manager.dart';
 
 class ChannelMessageStore {
   static const String _keyPrefix = 'channel_messages_';
 
   /// Save messages for a specific channel
   Future<void> saveChannelMessages(int channelIndex, List<ChannelMessage> messages) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_keyPrefix$channelIndex';
 
     // Convert messages to JSON
@@ -21,7 +21,7 @@ class ChannelMessageStore {
 
   /// Load messages for a specific channel
   Future<List<ChannelMessage>> loadChannelMessages(int channelIndex) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_keyPrefix$channelIndex';
 
     final jsonString = prefs.getString(key);
@@ -38,14 +38,14 @@ class ChannelMessageStore {
 
   /// Clear messages for a specific channel
   Future<void> clearChannelMessages(int channelIndex) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final key = '$_keyPrefix$channelIndex';
     await prefs.remove(key);
   }
 
   /// Clear all channel messages
   Future<void> clearAllChannelMessages() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = PrefsManager.instance;
     final keys = prefs.getKeys().where((k) => k.startsWith(_keyPrefix));
     for (var key in keys) {
       await prefs.remove(key);
@@ -67,6 +67,10 @@ class ChannelMessageStore {
       'pathBytes': base64Encode(msg.pathBytes),
       'pathVariants': msg.pathVariants.map(base64Encode).toList(),
       'repeats': msg.repeats.map(_repeatToJson).toList(),
+      'messageId': msg.messageId,
+      'replyToMessageId': msg.replyToMessageId,
+      'replyToSenderName': msg.replyToSenderName,
+      'replyToText': msg.replyToText,
     };
   }
 
@@ -96,6 +100,10 @@ class ChannelMessageStore {
               .toList() ??
           const [],
       channelIndex: json['channelIndex'] as int?,
+      messageId: json['messageId'] as String?,
+      replyToMessageId: json['replyToMessageId'] as String?,
+      replyToSenderName: json['replyToSenderName'] as String?,
+      replyToText: json['replyToText'] as String?,
     );
   }
 
